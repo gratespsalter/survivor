@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>🏀 Survivor Command Center</title>
+<style>
+  :root {
+    --gold: #CFAE70;
+    --orange: #FF6B00;
+    --red: #E41C38;
+    --green: #4CAF50;
+    --bg: #0c0c10;
+    --surface: rgba(255,255,255,0.05);
+    --border: rgba(255,255,255,0.08);
+    --text: #f0ede4;
+    --muted: rgba(240,237,228,0.45);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse at 10% 10%, rgba(255,107,0,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 90%, rgba(228,28,56,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(207,174,112,0.03) 0%, transparent 60%);
+  }
+
+  /* HEADER */
+  #header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(12,12,16,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(207,174,112,0.15);
+    padding: 14px 18px 0;
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .header-title-label { font-size: 10px; letter-spacing: 4px; color: var(--gold); text-transform: uppercase; margin-bottom: 3px; }
+  .header-title { font-size: 20px; font-weight: bold; letter-spacing: -0.3px; }
+  .field-count { text-align: right; }
+  .field-count .num { font-size: 28px; font-weight: bold; color: var(--gold); transition: color 0.4s; font-variant-numeric: tabular-nums; }
+  .field-count .num.flash { color: var(--orange); }
+  .field-count .lbl { font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* Progress bar */
+  .progress-wrap { margin: 10px 0 8px; background: rgba(255,255,255,0.07); border-radius: 3px; height: 3px; }
+  .progress-bar { height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--red), var(--orange), var(--gold)); transition: width 0.6s ease; }
+
+  /* Entry pills */
+  .pills { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pill {
+    padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: bold;
+    cursor: pointer; user-select: none; transition: all 0.2s;
+    border: 1px solid; font-family: Georgia, serif;
+  }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; padding-bottom: 0; }
+  .tab {
+    background: none; border: none; cursor: pointer;
+    padding: 8px 14px 10px; font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; font-family: Georgia, serif;
+    color: var(--muted); border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+  /* Panels */
+  .panel { display: none; padding: 16px 18px; }
+  .panel.active { display: block; }
+
+  /* Section label */
+  .section-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px; }
+
+  /* Live scores */
+  .score-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: border-color 0.3s;
+  }
+  .score-card.live { border-color: rgba(255,107,0,0.4); }
+  .score-card.final { border-color: rgba(255,255,255,0.06); opacity: 0.8; }
+  .score-card.upset { border-color: rgba(228,28,56,0.5); background: rgba(228,28,56,0.06); }
+  .score-teams { flex: 1; }
+  .score-matchup { font-size: 13px; font-weight: bold; }
+  .score-matchup .winner { color: var(--gold); }
+  .score-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .score-right { text-align: right; }
+  .score-status { font-size: 11px; font-weight: bold; }
+  .score-status.live-dot::before { content: '● '; color: var(--orange); animation: blink 1.2s infinite; }
+  .score-status.done { color: var(--muted); }
+  .score-nums { font-size: 15px; font-weight: bold; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* Last updated */
+  #last-updated { font-size: 10px; color: var(--muted); text-align: center; padding: 6px; }
+  #refresh-btn {
+    background: rgba(207,174,112,0.1); border: 1px solid rgba(207,174,112,0.25);
+    color: var(--gold); padding: 5px 14px; border-radius: 6px; cursor: pointer;
+    font-size: 11px; font-family: Georgia, serif; letter-spacing: 1px;
+    transition: all 0.2s; display: block; margin: 8px auto 0;
+  }
+  #refresh-btn:hover { background: rgba(207,174,112,0.2); }
+  #refresh-btn.spinning { opacity: 0.5; }
+
+  /* Elim log */
+  .elim-row { margin-bottom: 8px; }
+  .elim-top { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px; }
+  .elim-bar-wrap { background: rgba(255,255,255,0.06); border-radius: 3px; height: 3px; }
+  .elim-bar { height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--red), var(--orange)); }
+  .elim-count { color: var(--red); font-weight: bold; }
+
+  /* Add elim form */
+  .add-elim {
+    margin-top: 14px; padding: 12px;
+    background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.12);
+    border-radius: 8px;
+  }
+  .add-elim-label { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .add-elim-row { display: flex; gap: 7px; }
+  .add-elim input {
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; padding: 8px 10px; color: var(--text);
+    font-size: 12px; font-family: Georgia, serif; outline: none;
+  }
+  .add-elim input:focus { border-color: rgba(207,174,112,0.4); }
+  .add-elim input.team-input { flex: 2; }
+  .add-elim input.num-input { flex: 1; }
+  .add-btn {
+    background: var(--red); border: none; border-radius: 6px;
+    color: white; padding: 8px 14px; cursor: pointer;
+    font-size: 14px; font-weight: bold; flex-shrink: 0;
+  }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .stat-num { font-size: 22px; font-weight: bold; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 3px; }
+
+  /* Pick grid */
+  .pick-grid-row {
+    margin-bottom: 8px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .pick-grid-row.done { border-color: rgba(76,175,80,0.2); background: rgba(76,175,80,0.04); }
+  .pick-grid-row.today { border-color: rgba(207,174,112,0.3); background: rgba(207,174,112,0.06); }
+  .pick-grid-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; background: rgba(0,0,0,0.25);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .pick-grid-header .day-label { font-size: 12px; font-weight: bold; }
+  .pick-grid-header .round-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .pick-grid-cells { display: grid; grid-template-columns: 1fr 1fr; }
+  .pick-cell {
+    padding: 8px 12px;
+    border-right: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .pick-cell:nth-child(2n) { border-right: none; }
+  .pick-cell:nth-child(3), .pick-cell:nth-child(4) { border-bottom: none; }
+  .pick-owner { font-size: 9px; color: var(--muted); margin-bottom: 2px; }
+  .pick-team { font-size: 12px; font-weight: bold; }
+
+  /* AI Chat */
+  #chat-wrap {
+    display: flex; flex-direction: column;
+    height: calc(100vh - 200px);
+  }
+  #messages { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+  .msg { margin-bottom: 14px; }
+  .msg.user { display: flex; justify-content: flex-end; }
+  .msg.assistant .msg-label { font-size: 10px; color: var(--gold); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; }
+  .bubble {
+    max-width: 92%; padding: 11px 13px; font-size: 13px; line-height: 1.6;
+  }
+  .bubble.user {
+    background: linear-gradient(135deg, var(--orange), var(--red));
+    border-radius: 12px 12px 3px 12px; color: white;
+  }
+  .bubble.assistant {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(207,174,112,0.15);
+    border-radius: 3px 12px 12px 12px; color: rgba(240,237,228,0.9);
+  }
+  .bubble strong { color: var(--gold); }
+  .bubble h3 { color: var(--gold); font-size: 13px; margin: 8px 0 3px; }
+  .bubble h2 { color: var(--orange); font-size: 14px; margin: 10px 0 4px; }
+  .bubble ul { padding-left: 16px; margin: 4px 0; }
+  .bubble li { margin-bottom: 3px; }
+  .bubble hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 0; }
+  .bubble table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+  .bubble td { padding: 3px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .bubble td:first-child { color: var(--muted); }
+
+  /* Quick prompts */
+  #quick-prompts {
+    display: flex; gap: 6px; overflow-x: auto; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    scrollbar-width: none;
+  }
+  #quick-prompts::-webkit-scrollbar { display: none; }
+  .qp-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; color: var(--muted); cursor: pointer;
+    font-size: 11px; padding: 5px 12px; white-space: nowrap;
+    font-family: Georgia, serif; transition: all 0.2s; flex-shrink: 0;
+  }
+  .qp-btn:hover { border-color: rgba(207,174,112,0.3); color: var(--gold); }
+
+  /* Input row */
+  #input-row {
+    display: flex; gap: 8px; align-items: flex-end;
+    padding: 10px 0 4px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  #chat-input {
+    flex: 1; background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(207,174,112,0.2);
+    border-radius: 10px; color: var(--text);
+    font-size: 13px; padding: 9px 13px;
+    font-family: Georgia, serif; resize: none; outline: none;
+    line-height: 1.5;
+  }
+  #chat-input:focus { border-color: rgba(207,174,112,0.4); }
+  #send-btn {
+    background: linear-gradient(135deg, var(--orange), var(--red));
+    border: none; border-radius: 10px; color: white;
+    cursor: pointer; font-size: 18px; padding: 9px 15px;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  #send-btn:disabled { background: rgba(255,255,255,0.1); cursor: default; }
+
+  /* Typing indicator */
+  .typing { display: flex; align-items: center; gap: 6px; padding: 8px 0; }
+  .typing-label { font-size: 10px; color: var(--gold); letter-spacing: 2px; text-transform: uppercase; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(207,174,112,0.2); border-radius: 2px; }
+
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+  @keyframes fadeInUp { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+
+  /* Upset alert */
+  .upset-alert {
+    background: rgba(228,28,56,0.12); border: 1px solid rgba(228,28,56,0.4);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 10px;
+    font-size: 12px; color: #ff6b6b;
+    animation: pulse-border 2s infinite;
+  }
+  @keyframes pulse-border { 0%,100% { border-color: rgba(228,28,56,0.4); } 50% { border-color: rgba(228,28,56,0.8); } }
+
+  input::placeholder { color: rgba(240,237,228,0.25); }
+  textarea::placeholder { color: rgba(240,237,228,0.25); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="header-top">
+    <div>
+      <div class="header-title-label">2026 NCAA Tournament</div>
+      <div class="header-title">🏀 Survivor Command Center</div>
+    </div>
+    <div class="field-count">
+      <div class="num" id="field-num">441</div>
+      <div class="lbl">survivors left</div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-bar" id="progress-bar" style="width:65%"></div>
+  </div>
+
+  <div class="pills" id="entry-pills"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('scores')">📡 Live Scores</button>
+    <button class="tab" onclick="switchTab('advisor')">🤖 AI Advisor</button>
+    <button class="tab" onclick="switchTab('picks')">📋 Picks</button>
+    <button class="tab" onclick="switchTab('field')">📊 Field</button>
+  </div>
+</div>
+
+<!-- SCORES PANEL -->
+<div class="panel active" id="panel-scores">
+  <div class="section-label" style="color:var(--orange)">⚡ Live Tournament Scores</div>
+  <div id="upset-alerts"></div>
+  <div id="scores-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Loading scores...</div></div>
+  <div id="last-updated">Never refreshed</div>
+  <button id="refresh-btn" onclick="fetchScores()">↻ Refresh Now</button>
+</div>
+
+<!-- AI ADVISOR PANEL -->
+<div class="panel" id="panel-advisor">
+  <div id="chat-wrap">
+    <div id="messages"></div>
+    <div id="quick-prompts"></div>
+    <div id="input-row">
+      <textarea id="chat-input" rows="2" placeholder="Ask about picks, matchups, strategy..."></textarea>
+      <button id="send-btn" onclick="sendMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- PICKS PANEL -->
+<div class="panel" id="panel-picks">
+  <div class="section-label" style="color:var(--gold)">9-Day Pick Grid</div>
+  <div id="pick-legend" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px"></div>
+  <div id="pick-grid"></div>
+</div>
+
+<!-- FIELD PANEL -->
+<div class="panel" id="panel-field">
+  <div class="stats-grid">
+    <div class="stat-box"><div class="stat-num" style="color:var(--gold)">677</div><div class="stat-label">Started</div></div>
+    <div class="stat-box"><div class="stat-num" id="elim-total" style="color:var(--red)">236</div><div class="stat-label">Eliminated</div></div>
+    <div class="stat-box"><div class="stat-num" id="alive-total" style="color:var(--green)">441</div><div class="stat-label">Alive</div></div>
+  </div>
+  <div class="section-label" style="color:var(--red)">Eliminations Log</div>
+  <div id="elim-log"></div>
+  <div class="add-elim">
+    <div class="add-elim-label">Log New Elimination</div>
+    <div class="add-elim-row">
+      <input type="text" class="team-input" id="elim-team" placeholder="Team name"/>
+      <input type="number" class="num-input" id="elim-count" placeholder="# entries"/>
+      <button class="add-btn" onclick="addElimination()">+</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+const INITIAL_FIELD = 677;
+
+const ENTRIES = [
+  { id:1, owner:"Jesse",       emoji:"🥇", color:"#FF6B00", alive:true,  used:["Illinois"] },
+  { id:2, owner:"Andrew",      emoji:"🥈", color:"#E8D5A3", alive:true,  used:["Nebraska"] },
+  { id:3, owner:"Johnathan 1", emoji:"🥉", color:"#CFAE70", alive:true,  used:["Vanderbilt"] },
+  { id:4, owner:"Johnathan 2", emoji:"4️⃣",  color:"#9D2235", alive:true,  used:["Arkansas"] },
+];
+
+const PICK_PLAN = [
+  { day:1, label:"R64 · Thu", done:true,  picks:["Illinois","Nebraska","Vanderbilt","Arkansas"] },
+  { day:2, label:"R64 · Fri", today:true, picks:["Iowa State","Virginia","Alabama","Texas Tech"] },
+  { day:3, label:"R32 · Sat", picks:["Michigan","Houston","Arkansas","Gonzaga"] },
+  { day:4, label:"R32 · Sun", picks:["Duke","Kansas","Michigan St","UConn"] },
+  { day:5, label:"S16 · Thu", picks:["Arizona","Florida","Iowa State","Michigan"] },
+  { day:6, label:"S16 · Fri", picks:["Houston","Gonzaga","Duke","Arizona"] },
+  { day:7, label:"E8 · Sat",  picks:["UConn","Michigan","Gonzaga","Duke"] },
+  { day:8, label:"F4 · Mon",  picks:["Florida","Arizona","Houston","Florida"] },
+  { day:9, label:"NCG · Wed", picks:["Michigan","Duke","Arizona","Houston"] },
+];
+
+let eliminations = [
+  { team:"Wisconsin",    entries:79,  pct:11.7 },
+  { team:"Ohio State",   entries:53,  pct:7.8  },
+  { team:"South Florida",entries:39,  pct:5.8  },
+  { team:"Saint Mary's", entries:51,  pct:7.5  },
+  { team:"BYU",          entries:14,  pct:2.1  },
+  { team:"UNC",          entries:22,  pct:3.2  },
+];
+
+let chatHistory = [];
+let refreshTimer = null;
+
+// ── Survivor context for Claude ───────────────────────────────────────────
+function buildContext() {
+  const totalElim = eliminations.reduce((s,e) => s+e.entries, 0);
+  const fieldLeft = INITIAL_FIELD - totalElim;
+  return `You are an expert March Madness survivor contest advisor.
+
+CONTEST: "The Best Damn Survivor Contest" — DraftKings NCAAB Survivor
+RULES: Pick 1 winner straight up per day. All 4 entries must pick DIFFERENT teams each day.
+Can't reuse a team for the same entry. 9 days total. Started with 677 entries.
+Tiebreaker: lower ownership = better tiebreaker edge.
+
+OUR 4 LIVE ENTRIES:
+1. Jesse 🥇 (Priority #1 — protect most, lowest ownership) — Used: Illinois
+2. Andrew 🥈 (Priority #2) — Used: Nebraska
+3. Johnathan 1 🥉 (Priority #3) — Used: Vanderbilt
+4. Johnathan 2 4️⃣ (Priority #4 — swing entry) — Used: Arkansas
+
+PLANNED PICKS:
+Day 1 ✅ Done: Jesse=Illinois, Andrew=Nebraska, Johnathan1=Vanderbilt, Johnathan2=Arkansas
+Day 2 🎯 TODAY (Fri R64): Jesse=Iowa State, Andrew=Virginia, Johnathan1=Alabama, Johnathan2=Texas Tech
+Day 3 (Sat R32): Jesse=Michigan, Andrew=Houston, Johnathan1=Arkansas, Johnathan2=Gonzaga
+Day 4 (Sun R32): Jesse=Duke, Andrew=Kansas, Johnathan1=MichiganSt, Johnathan2=UConn
+Day 5 (Thu S16): Jesse=Arizona, Andrew=Florida, Johnathan1=IowaSt, Johnathan2=Michigan
+Day 6 (Fri S16): Jesse=Houston, Andrew=Gonzaga, Johnathan1=Duke, Johnathan2=Arizona
+Day 7 (Sat E8): Jesse=UConn, Andrew=Michigan, Johnathan1=Gonzaga, Johnathan2=Duke
+Day 8 (Mon F4): Jesse=Florida, Andrew=Arizona, Johnathan1=Houston, Johnathan2=Florida
+Day 9 (Wed NCG): Jesse=Michigan, Andrew=Duke, Johnathan1=Arizona, Johnathan2=Houston
+
+STRATEGY: Never burn Michigan/Duke/Arizona/Gonzaga/Houston early (save for S16+).
+Jesse gets safest pick. Johnathan2 is swing entry.
+
+FIELD: Started 677. Currently ${fieldLeft} alive. ${totalElim} eliminated.
+Eliminated: ${eliminations.map(e => `${e.team}(${e.entries})`).join(', ')}
+
+KEY KENPOM: Michigan=#1, Duke=#2, Arizona=#3, Houston=#4, IowaSt=#5, Gonzaga=#6, Florida=#9, UConn=#11, Kansas=#10, Virginia=#13, Nebraska=#14, Alabama=#16
+
+NOTES: Duke barely beat Siena 71-65. Alabama's Holloway arrested — monitor.
+Gonzaga trailed Kennesaw State early in Day 1 late games — check result.
+
+Be concise, specific, reference entries by name. Use emojis and clear formatting.`;
+}
+
+// ── ESPN Score Fetching ───────────────────────────────────────────────────
+async function fetchScores() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  btn.textContent = '↻ Refreshing...';
+
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth()+1).padStart(2,'0');
+  const d = String(today.getDate()).padStart(2,'0');
+  const todayStr = `${y}${m}${d}`;
+
+  const ESPN_URL = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${todayStr}&groups=100&limit=64`;
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(ESPN_URL)}`,
+    `https://corsproxy.io/?${encodeURIComponent(ESPN_URL)}`,
+    ESPN_URL
+  ];
+
+  let success = false;
+  for (const url of proxies) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      const text = await res.text();
+      if (!text || text.length < 10) continue;
+      const data = JSON.parse(text);
+      if (data && Array.isArray(data.events)) {
+        renderScores(data.events);
+        document.getElementById('last-updated').textContent =
+          `Last updated: ${new Date().toLocaleTimeString()} · Auto-refreshes every 15s`;
+        success = true;
+        break;
+      }
+    } catch(e) { continue; }
+  }
+
+  if (!success) {
+    document.getElementById('scores-list').innerHTML =
+      `<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">
+        ⚠️ ESPN scores unavailable right now.<br>
+        <span style="font-size:11px;opacity:0.5">Retrying in 60s · Date queried: ${y}${m}${d}</span>
+      </div>`;
+    document.getElementById('last-updated').textContent = `Last attempt: ${new Date().toLocaleTimeString()} — failed`;
+  }
+
+  btn.classList.remove('spinning');
+  btn.textContent = '↻ Refresh Now';
+}
+
+// Tracked picks for upset detection
+// Current day's picks indexed by entry position [Jesse, Andrew, Johnathan1, Johnathan2]
+const TODAYS_PICKS = ["Iowa State","Virginia","Alabama","Texas Tech"];
+
+// Ownership map: team -> number of contest entries that picked them
+const OWNERSHIP_MAP = {
+  "Wisconsin":79, "Ohio State":53, "South Florida":39, "Saint Mary's":51,
+  "BYU":14, "UNC":22, "North Carolina":22, "VCU":50, "Arkansas":54,
+  "Vanderbilt":52, "Nebraska":74, "Illinois":23, "Georgia":22,
+  "Gonzaga":31, "Michigan State":21, "Michigan St":21, "Louisville":15,
+  "Duke":6, "Houston":3, "Michigan":1, "Texas A&M":11,
+  "Illinois State":20, "Saint Louis":17, "TCU":14, "Texas":15,
+};
+
+// Already eliminated teams (don't re-add)
+const alreadyEliminated = new Set(["Wisconsin","Ohio State","South Florida","Saint Mary's","BYU","UNC","North Carolina"]);
+
+function renderScores(events) {
+  if (!events.length) {
+    document.getElementById('scores-list').innerHTML =
+      `<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">No tournament games found for today.</div>`;
+    return;
+  }
+
+  // Sort: live first, then scheduled, then final
+  const order = { 'in':0, 'pre':1, 'post':2 };
+  events.sort((a,b) => {
+    const sa = order[a.status?.type?.state] ?? 3;
+    const sb = order[b.status?.type?.state] ?? 3;
+    return sa - sb;
+  });
+
+  let alertsHtml = '';
+  let html = '';
+  let autoElims = [];
+  let losers = []; // track all final game losers for auto-field-update
+
+  events.forEach(ev => {
+    const comps = ev.competitions?.[0];
+    if (!comps) return;
+    const teams = comps.competitors || [];
+    const home = teams.find(t => t.homeAway === 'home');
+    const away = teams.find(t => t.homeAway === 'away');
+    if (!home || !away) return;
+
+    const homeName = home.team?.shortDisplayName || home.team?.displayName || 'Home';
+    const awayName = away.team?.shortDisplayName || away.team?.displayName || 'Away';
+    const homeScore = parseInt(home.score) || 0;
+    const awayScore = parseInt(away.score) || 0;
+    const homeSeed = home.curatedRank?.current || home.team?.seed || '';
+    const awaySeed = away.team?.seed || away.curatedRank?.current || '';
+    const stateType = ev.status?.type?.state;
+    const statusDesc = ev.status?.type?.description || '';
+    const clock = ev.status?.displayClock || '';
+    const period = ev.status?.period || '';
+    const isLive = stateType === 'in';
+    const isFinal = stateType === 'post';
+    const isScheduled = stateType === 'pre';
+
+    // Determine winner for final games
+    let winner = null, loser = null;
+    if (isFinal) {
+      if (homeScore > awayScore) { winner = homeName; loser = awayName; }
+      else { winner = awayName; loser = homeName; }
+      if (loser) losers.push(loser);
+    }
+
+    // Upset detection: lower seed wins
+    const homeNumSeed = parseInt(homeSeed) || 8;
+    const awayNumSeed = parseInt(awaySeed) || 8;
+    const isUpset = isFinal && (
+      (homeScore > awayScore && homeNumSeed > awayNumSeed + 3) ||
+      (awayScore > homeScore && awayNumSeed > homeNumSeed + 3)
+    );
+
+    // Check if high ownership team lost
+    if (isFinal && loser) {
+      const elimEntry = HIGH_OWNERSHIP.find(t =>
+        loser.toLowerCase().includes(t.toLowerCase()) ||
+        t.toLowerCase().includes(loser.toLowerCase())
+      );
+      if (elimEntry) {
+        const existing = eliminations.find(e => e.team === elimEntry);
+        if (!existing) autoElims.push(elimEntry);
+      }
+    }
+
+    // Alert if our pick today is losing live
+    const ourPickLosing = isLive && OUR_PICKS_TODAY.some(p =>
+      (homeName.includes(p) || p.includes(homeName)) && homeScore < awayScore ||
+      (awayName.includes(p) || p.includes(awayName)) && awayScore < homeScore
+    );
+
+    if (isUpset || ourPickLosing) {
+      const alertTeam = isUpset ? loser : OUR_PICKS_TODAY.find(p => homeName.includes(p) || awayName.includes(p));
+      if (alertTeam) {
+        alertsHtml += `<div class="upset-alert">⚠️ <strong>${alertTeam}</strong> — ${isUpset ? 'UPSET LOSS' : 'currently trailing live!'} Check your picks!</div>`;
+      }
+    }
+
+    // Card classes
+    let cardClass = 'score-card';
+    if (isLive) cardClass += ' live';
+    else if (isFinal) cardClass += ' final';
+    if (isUpset) cardClass += ' upset';
+
+    // Score display
+    let statusHtml = '';
+    if (isLive) statusHtml = `<span class="score-status live-dot">Live · ${clock} ${period > 0 ? `${period}H` : ''}</span>`;
+    else if (isFinal) statusHtml = `<span class="score-status done">Final</span>`;
+    else {
+      const startTime = new Date(ev.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      statusHtml = `<span class="score-status" style="color:var(--muted)">${startTime}</span>`;
+    }
+
+    const homeWin = isFinal && homeScore > awayScore;
+    const awayWin = isFinal && awayScore > homeScore;
+    const seedStr = s => s ? `<span style="color:var(--muted);font-size:10px">(${s}) </span>` : '';
+
+    html += `
+      <div class="${cardClass}">
+        <div class="score-teams">
+          <div class="score-matchup">
+            <span class="${awayWin ? 'winner' : ''}">${seedStr(awaySeed)}${awayName}</span>
+            <span style="color:var(--muted);font-size:11px"> vs </span>
+            <span class="${homeWin ? 'winner' : ''}">${seedStr(homeSeed)}${homeName}</span>
+          </div>
+          <div class="score-sub">${ev.name || ''}</div>
+        </div>
+        <div class="score-right">
+          ${statusHtml}
+          ${!isScheduled ? `<div class="score-nums" style="color:${isLive?'var(--orange)':'var(--text)'}">
+            ${awayScore} – ${homeScore}
+          </div>` : ''}
+        </div>
+      </div>`;
+  });
+
+  document.getElementById('upset-alerts').innerHTML = alertsHtml;
+  document.getElementById('scores-list').innerHTML = html || `<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No games found.</div>`;
+
+  // ── Auto-update Field + Entries from final scores ──────────────────────
+  losers.forEach(loserName => {
+    // Check ownership map for field eliminations
+    for (const [team, count] of Object.entries(OWNERSHIP_MAP)) {
+      if (alreadyEliminated.has(team)) continue;
+      const match = loserName.toLowerCase().includes(team.toLowerCase()) ||
+                    team.toLowerCase().includes(loserName.toLowerCase()) ||
+                    loserName.toLowerCase().split(' ').some(w => w.length > 3 && team.toLowerCase().includes(w));
+      if (match) {
+        alreadyEliminated.add(team);
+        const existing = eliminations.find(e => e.team.toLowerCase() === team.toLowerCase());
+        if (!existing) {
+          const pct = ((count/INITIAL_FIELD)*100).toFixed(1);
+          eliminations.push({ team, entries: count, pct });
+          showToast(`❌ ${team} eliminated — ${count} entries gone from field`);
+        }
+        break;
+      }
+    }
+
+    // Check if any of our 4 entries picked the loser today
+    TODAYS_PICKS.forEach((pick, i) => {
+      const entry = ENTRIES[i];
+      if (!entry || !entry.alive) return;
+      const match = loserName.toLowerCase().includes(pick.toLowerCase()) ||
+                    pick.toLowerCase().includes(loserName.toLowerCase());
+      if (match) {
+        entry.alive = false;
+        showToast(`💀 ${entry.owner}'s entry eliminated! ${pick} lost.`);
+      }
+    });
+  });
+
+  // Re-render if anything changed
+  updateField();
+  renderPills();
+  renderPickGrid();
+}
+
+// ── Auto-refresh every 60s ───────────────────────────────────────────────
+function startAutoRefresh() {
+  fetchScores();
+  refreshTimer = setInterval(fetchScores, 15000);
+}
+
+// ── Entry pills ───────────────────────────────────────────────────────────
+function renderPills() {
+  const wrap = document.getElementById('entry-pills');
+  wrap.innerHTML = ENTRIES.map(e => `
+    <button class="pill" onclick="toggleEntry(${e.id})"
+      style="border-color:${e.alive ? e.color : 'rgba(255,255,255,0.1)'};
+             color:${e.alive ? e.color : 'rgba(255,255,255,0.3)'};
+             background:${e.alive ? e.color+'20' : 'rgba(255,255,255,0.03)'}">
+      ${e.emoji} ${e.owner} ${e.alive ? '✅' : '❌'}
+    </button>`).join('');
+}
+
+function toggleEntry(id) {
+  const e = ENTRIES.find(x => x.id === id);
+  if (e) { e.alive = !e.alive; renderPills(); renderPickGrid(); }
+}
+
+// ── Pick grid ─────────────────────────────────────────────────────────────
+function renderPickGrid() {
+  // Legend
+  document.getElementById('pick-legend').innerHTML = ENTRIES.map(e =>
+    `<div style="display:flex;align-items:center;gap:5px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${e.color}"></div>
+      <span style="font-size:11px;color:var(--muted)">${e.owner}</span>
+    </div>`).join('');
+
+  // Grid
+  document.getElementById('pick-grid').innerHTML = PICK_PLAN.map(day => {
+    const cls = day.done ? 'done' : day.today ? 'today' : '';
+    const icon = day.done ? '✅' : day.today ? '🎯' : '📅';
+    const cells = ENTRIES.map((e,i) => `
+      <div class="pick-cell" style="opacity:${e.alive?1:0.3}">
+        <div class="pick-owner">${e.owner}</div>
+        <div class="pick-team" style="color:${day.today ? e.color : day.done ? 'rgba(76,175,80,0.8)' : 'rgba(240,237,228,0.7)'}">${day.picks[i]}</div>
+      </div>`).join('');
+    return `
+      <div class="pick-grid-row ${cls}">
+        <div class="pick-grid-header">
+          <div class="day-label">${icon} Day ${day.day}</div>
+          <div class="round-label">${day.label}</div>
+        </div>
+        <div class="pick-grid-cells">${cells}</div>
+      </div>`;
+  }).join('');
+}
+
+// ── Field / eliminations ──────────────────────────────────────────────────
+function updateField() {
+  const total = eliminations.reduce((s,e) => s+e.entries, 0);
+  const alive = INITIAL_FIELD - total;
+  document.getElementById('field-num').textContent = alive.toLocaleString();
+  document.getElementById('elim-total').textContent = total.toLocaleString();
+  document.getElementById('alive-total').textContent = alive.toLocaleString();
+  document.getElementById('progress-bar').style.width = `${(alive/INITIAL_FIELD)*100}%`;
+
+  // Pulse
+  const numEl = document.getElementById('field-num');
+  numEl.classList.add('flash');
+  setTimeout(() => numEl.classList.remove('flash'), 600);
+
+  // Render log
+  const sorted = [...eliminations].sort((a,b) => b.entries - a.entries);
+  document.getElementById('elim-log').innerHTML = sorted.map(e => `
+    <div class="elim-row">
+      <div class="elim-top">
+        <span>❌ ${e.team}</span>
+        <span class="elim-count">${e.entries} entries (${e.pct}%)</span>
+      </div>
+      <div class="elim-bar-wrap">
+        <div class="elim-bar" style="width:${Math.min((e.entries/79)*100,100)}%"></div>
+      </div>
+    </div>`).join('');
+}
+
+function addElimination() {
+  const team = document.getElementById('elim-team').value.trim();
+  const count = parseInt(document.getElementById('elim-count').value);
+  if (!team || !count) return;
+  const pct = ((count/INITIAL_FIELD)*100).toFixed(1);
+  eliminations.push({ team, entries:count, pct });
+  document.getElementById('elim-team').value = '';
+  document.getElementById('elim-count').value = '';
+  updateField();
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Claude AI Chat ────────────────────────────────────────────────────────
+const QUICK_PROMPTS = [
+  { label:"🎯 Day 2 picks", text:"What are the optimal picks for all 4 entries on Day 2 (Friday)? Evaluate Iowa State, Virginia, Alabama, Texas Tech." },
+  { label:"📊 Field update", text:"With the current eliminations, how does this change our overall strategy?" },
+  { label:"⚠️ Gonzaga risk", text:"If Gonzaga lost Day 1, how should we adjust Day 3's pick grid?" },
+  { label:"🏆 Jesse's path", text:"What's the optimal path for Jesse's entry (#1 priority) to win the whole contest?" },
+  { label:"🔄 Alabama risk", text:"Alabama's Holloway was arrested. Should Johnathan 1 pick someone else on Day 2?" },
+  { label:"💀 Upset risks", text:"Which of our Day 2-4 planned picks carry the most upset risk?" },
+  { label:"🃏 Ownership edge", text:"How do we best exploit low ownership picks for tiebreaker advantage?" },
+];
+
+function renderQuickPrompts() {
+  document.getElementById('quick-prompts').innerHTML = QUICK_PROMPTS.map(p =>
+    `<button class="qp-btn" onclick="sendMessage('${p.text.replace(/'/g,"\\'")}')">
+      ${p.label}
+    </button>`).join('');
+}
+
+function addMessage(role, text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (role === 'assistant') {
+    div.innerHTML = `
+      <div class="msg-label">🤖 AI Advisor</div>
+      <div class="bubble assistant">${formatMarkdown(text)}</div>`;
+  } else {
+    div.innerHTML = `<div class="bubble user">${text}</div>`;
+  }
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.id = 'typing-indicator';
+  div.className = 'typing';
+  div.innerHTML = `<span class="typing-label">🤖 thinking</span>
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+function formatMarkdown(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^---$/gm,'<hr/>')
+    .replace(/^[-*] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n\n/g,'<br/><br/>')
+    .replace(/\n/g,'<br/>');
+}
+
+async function sendMessage(presetText) {
+  const input = document.getElementById('chat-input');
+  const text = presetText || input.value.trim();
+  if (!text) return;
+
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  input.value = '';
+
+  addMessage('user', text);
+  chatHistory.push({ role:'user', content: text });
+
+  showTyping();
+
+  try {
+    const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+    if (!window._apiKey) {
+      window._apiKey = prompt('Enter your Anthropic API key to enable AI Advisor (starts with sk-ant-):');
+      if (!window._apiKey) {
+        removeTyping();
+        addMessage('assistant', '⚠️ No API key provided. Enter your key to use the AI Advisor.');
+        btn.disabled = false;
+        return;
+      }
+    }
+    const API_KEY = window._apiKey;
+    const body = JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1000,
+      system: buildContext(),
+      messages: chatHistory,
+    });
+
+    // Try direct first, then proxies
+    const aiAttempts = [
+      { url: ANTHROPIC_URL, headers: {
+          'Content-Type':'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        }
+      },
+      { url: `https://corsproxy.io/?${encodeURIComponent(ANTHROPIC_URL)}`, headers: {
+          'Content-Type':'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        }
+      },
+      { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(ANTHROPIC_URL)}`, headers: {
+          'Content-Type':'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        }
+      },
+    ];
+
+    let reply = null;
+    let lastErr = '';
+    for (const attempt of aiAttempts) {
+      try {
+        const res = await fetch(attempt.url, {
+          method:'POST',
+          headers: attempt.headers,
+          body
+        });
+        const text = await res.text();
+        if (!text || text.length < 5) { lastErr = 'Empty response'; continue; }
+        const data = JSON.parse(text);
+        if (data.error) { lastErr = data.error.message || JSON.stringify(data.error); continue; }
+        const content = data.content?.map(b => b.text||'').join('');
+        if (content) { reply = content; break; }
+        lastErr = 'No content in response';
+      } catch(e) { lastErr = e.message; continue; }
+    }
+
+    removeTyping();
+    if (reply) {
+      chatHistory.push({ role:'assistant', content: reply });
+      addMessage('assistant', reply);
+    } else {
+      addMessage('assistant', `⚠️ AI unavailable: ${lastErr}. Try again in a moment.`);
+    }
+  } catch(err) {
+    removeTyping();
+    addMessage('assistant', '⚠️ Unexpected error: ' + err.message);
+  }
+
+  btn.disabled = false;
+}
+
+// Enter key sends
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// ── Toast notifications ──────────────────────────────────────────────────
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    background:rgba(12,12,16,0.95); border:1px solid rgba(207,174,112,0.4);
+    color:#f0ede4; padding:10px 18px; border-radius:20px; font-size:13px;
+    z-index:9999; white-space:nowrap; font-family:Georgia,serif;
+    box-shadow:0 4px 20px rgba(0,0,0,0.5); animation:fadeInUp 0.3s ease;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+function init() {
+  renderPills();
+  renderPickGrid();
+  updateField();
+  renderQuickPrompts();
+
+  // Welcome message
+  addMessage('assistant',
+    `👋 **Welcome to your Survivor Command Center!**\n\nAll 4 entries survived Day 1 — Jesse, Andrew, Johnathan 1, and Johnathan 2 are alive. ✅\n\n**Day 2 picks are locked:**\n- 🥇 Jesse → Iowa State\n- 🥈 Andrew → Virginia\n- 🥉 Johnathan 1 → Alabama\n- 4️⃣ Johnathan 2 → Texas Tech\n\nLive scores auto-refresh every 60 seconds. Tap a quick prompt or ask me anything!`
+  );
+
+  // Start ESPN live scores
+  startAutoRefresh();
+}
+
+init();
+</script>
+</body>
+</html>
